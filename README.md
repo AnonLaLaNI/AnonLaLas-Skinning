@@ -55,6 +55,24 @@ WoW AddOn for **Midnight 12.0.1** to optimize Skinning/Leatherworking farm route
 - `/msa spots` — list saved spots
 - `/msa tomtom [index]` — set TomTom waypoint to saved spot
 
-## Packaging Note
+## CurseForge Release
 
-Repo root contains addon files directly. If you prefer a folder package named `MidnightSkinAdvisor`, move files into that folder before zipping for release.
+This repo is CurseForge-packager ready:
+
+- Addon files are in `MidnightSkinAdvisor/`
+- `.pkgmeta` is included with `package-as: MidnightSkinAdvisor`
+
+### Option A: Automatic packaging (recommended)
+
+1. Create a CurseForge project (WoW Retail).
+2. Connect this GitHub repository in project settings.
+3. Push a tag like `v2.0.1`:
+   - `git tag v2.0.1 && git push origin v2.0.1`
+4. CurseForge packs and publishes the release.
+
+### Option B: Manual upload
+
+1. Zip the `MidnightSkinAdvisor` folder (folder itself must be at zip root).
+2. Upload the zip on your CurseForge project files page.
+
+After publication, users can install/update with one click via CurseForge App/WowUp.
