@@ -5,6 +5,8 @@ MSA:RegisterEvent("ADDON_LOADED")
 MSA:RegisterEvent("CHAT_MSG_LOOT")
 MSA:RegisterEvent("PLAYER_LOGIN")
 
+local cmdUI
+
 local function now() return time() end
 local function n(v) return tonumber(v) or 0 end
 
@@ -29,7 +31,7 @@ local DEFAULT_CONFIG = {
 local function ensureDB()
     MidnightSkinAdvisorDB = MidnightSkinAdvisorDB or {}
     local db = MidnightSkinAdvisorDB
-    db.version = "2.2.0"
+    db.version = "2.3.0"
     db.createdAt = db.createdAt or now()
     db.config = db.config or {}
     for k, v in pairs(DEFAULT_CONFIG) do if db.config[k] == nil then db.config[k] = v end end
@@ -42,6 +44,7 @@ local function ensureDB()
         "Those three mats currently appear extremely rare; community reports possible drop bug.",
         "High Value Beasts usually add 5-10 extra leather/scales when skinned.",
     }
+    db.minimap = db.minimap or { angle = 225, hide = false }
 
     if not db.itemConfig then
         db.itemConfig = {}
@@ -109,6 +112,7 @@ local function collectRankedZones()
             scorePH = zoneScorePerHour(zone),
             total = zone.totalCount,
             highValueFlags = zone.highValueFlags or 0,
+            zone = zone,
         }
     end
     table.sort(rows, function(a, b)
@@ -206,15 +210,103 @@ local function cmdAdd(itemLink, weight)
 end
 
 -- UI -------------------------------------------------------------------------
-MSA.ui = { activeTab = "overview", rows = {}, itemRows = {}, spotRows = {} }
-
+MSA.ui = { activeTab = "overview" }
 local TAB_COLOR = "|cff8fe9ff"
 local TITLE_COLOR = "|cffb89bff"
 
 local function clearRows(rows)
     for i = 1, #rows do
+        rows[i].itemID = nil
+        rows[i].zoneKey = nil
+        rows[i].spot = nil
         rows[i]:Hide()
     end
+end
+
+local function setRowTooltip(row)
+    row:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if self.itemID then
+            GameTooltip:SetItemByID(self.itemID)
+            if self.itemWeight then GameTooltip:AddLine(string.format("Weight: %.2f", self.itemWeight), 0.55, 0.8, 1) end
+            if self.itemCount then GameTooltip:AddLine("Looted: " .. self.itemCount, 0.55, 0.8, 1) end
+        elseif self.zoneKey and MidnightSkinAdvisorDB and MidnightSkinAdvisorDB.zones[self.zoneKey] then
+            local z = MidnightSkinAdvisorDB.zones[self.zoneKey]
+            GameTooltip:AddLine(self.zoneKey, 0.5, 0.85, 1)
+            GameTooltip:AddLine(string.format("Score/h: %.1f", zoneScorePerHour(z)), 1, 1, 1)
+            GameTooltip:AddLine("Total Loot: " .. (z.totalCount or 0), 1, 1, 1)
+            GameTooltip:AddLine("HV Flags: " .. (z.highValueFlags or 0), 1, 1, 1)
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Hovercard", 0.7, 0.7, 0.9)
+        elseif self.spot then
+            GameTooltip:AddLine(self.spot.name, 0.5, 0.85, 1)
+            GameTooltip:AddLine(string.format("Coordinates: %.1f, %.1f", self.spot.x, self.spot.y), 1, 1, 1)
+            GameTooltip:AddLine("Use /msa tomtom <index>", 0.65, 0.9, 0.65)
+        else
+            return
+        end
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+local function ensureMinimapButton()
+    if MSA.minimapButton then
+        if MidnightSkinAdvisorDB.minimap and MidnightSkinAdvisorDB.minimap.hide then MSA.minimapButton:Hide() else MSA.minimapButton:Show() end
+        return
+    end
+
+    local b = CreateFrame("Button", "MSA_MinimapButton", Minimap)
+    b:SetSize(32, 32)
+    b:SetFrameStrata("MEDIUM")
+    b:SetFrameLevel(8)
+    b:SetNormalTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(18, 18)
+    b.icon:SetPoint("CENTER", 0, 1)
+    b.icon:SetTexture("Interface\\Icons\\INV_Misc_Pelt_Wolf_01")
+
+    local function updatePosition()
+        local angle = (MidnightSkinAdvisorDB.minimap and MidnightSkinAdvisorDB.minimap.angle) or 225
+        local rad = math.rad(angle)
+        local x = math.cos(rad) * 80
+        local y = math.sin(rad) * 80
+        b:ClearAllPoints()
+        b:SetPoint("CENTER", Minimap, "CENTER", x, y)
+    end
+
+    b:SetScript("OnMouseDown", function(self, btn)
+        if btn == "LeftButton" then
+            cmdUI()
+        elseif btn == "RightButton" then
+            self.isDragging = true
+        end
+    end)
+    b:SetScript("OnMouseUp", function(self) self.isDragging = false end)
+    b:SetScript("OnUpdate", function(self)
+        if not self.isDragging then return end
+        local mx, my = Minimap:GetCenter()
+        local px, py = GetCursorPosition()
+        local scale = UIParent:GetEffectiveScale()
+        px, py = px / scale, py / scale
+        local angle = math.deg(math.atan2(py - my, px - mx))
+        MidnightSkinAdvisorDB.minimap.angle = angle
+        updatePosition()
+    end)
+
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Midnight Skin Advisor", 0.55, 0.85, 1)
+        GameTooltip:AddLine("Left Click: Open UI", 1, 1, 1)
+        GameTooltip:AddLine("Right Drag: Move", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    updatePosition()
+    if MidnightSkinAdvisorDB.minimap and MidnightSkinAdvisorDB.minimap.hide then b:Hide() end
+    MSA.minimapButton = b
 end
 
 local function ensureWindow()
@@ -241,7 +333,7 @@ local function ensureWindow()
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     f.title:SetPoint("TOPLEFT", 14, -8)
-    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.2|r")
+    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3|r")
 
     f.subtitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.subtitle:SetPoint("TOPLEFT", 16, -34)
@@ -286,7 +378,7 @@ local function ensureWindow()
     f.content:SetPoint("BOTTOMRIGHT", -10, 10)
 
     local function createRow(parent, y)
-        local row = CreateFrame("Frame", nil, parent)
+        local row = CreateFrame("Button", nil, parent)
         row:SetSize(700, 28)
         row:SetPoint("TOPLEFT", 4, y)
 
@@ -303,14 +395,21 @@ local function ensureWindow()
         row.bar:SetWidth(1)
         row.bar:SetStatusBarColor(0.28, 0.55, 1, 0.8)
 
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(18, 18)
+        row.icon:SetPoint("LEFT", 6, 0)
+        row.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+        row.icon:Hide()
+
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        row.text:SetPoint("LEFT", 8, 0)
+        row.text:SetPoint("LEFT", 30, 0)
         row.text:SetJustifyH("LEFT")
 
         row.right = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         row.right:SetPoint("RIGHT", -8, 0)
         row.right:SetJustifyH("RIGHT")
 
+        setRowTooltip(row)
         row:Hide()
         return row
     end
@@ -365,20 +464,20 @@ function MSA.renderActiveTab()
     if MSA.ui.activeTab == "overview" then
         local ranked = collectRankedZones()
         if #ranked == 0 then
-            f.overviewRows[1]:Show()
-            f.overviewRows[1].text:SetText("No data yet — start skinning and loot tracking will fill this view.")
-            f.overviewRows[1].right:SetText("")
-            f.overviewRows[1].bar:SetWidth(1)
+            local r = f.overviewRows[1]
+            r:Show(); r.icon:Hide(); r.bar:SetWidth(1)
+            r.text:SetText("No data yet — start skinning and loot tracking will fill this view.")
+            r.right:SetText("")
             return
         end
 
         local maxScore = ranked[1].scorePH > 0 and ranked[1].scorePH or 1
         for i = 1, math.min(#ranked, #f.overviewRows) do
-            local r, row = ranked[i], f.overviewRows[i]
-            row:Show()
-            row.text:SetText(string.format("%d) %s", i, r.zoneKey))
-            row.right:SetText(string.format("%.1f/h  •  %d loot  •  HV %d", r.scorePH, r.total, r.highValueFlags))
-            local pct = math.max(0.02, math.min(1, r.scorePH / maxScore))
+            local rec, row = ranked[i], f.overviewRows[i]
+            row:Show(); row.icon:Hide(); row.zoneKey = rec.zoneKey
+            row.text:SetText(string.format("%d) %s", i, rec.zoneKey))
+            row.right:SetText(string.format("%.1f/h  •  %d loot  •  HV %d", rec.scorePH, rec.total, rec.highValueFlags))
+            local pct = math.max(0.02, math.min(1, rec.scorePH / maxScore))
             row.bar:SetWidth(698 * pct)
             if i == 1 then row.bar:SetStatusBarColor(0.48, 0.82, 0.36, 0.85)
             elseif i <= 3 then row.bar:SetStatusBarColor(0.34, 0.62, 1.0, 0.85)
@@ -395,6 +494,11 @@ function MSA.renderActiveTab()
         for i = 1, math.min(#rows, #f.itemRows) do
             local row, rec = f.itemRows[i], rows[i]
             row:Show()
+            row.icon:Show()
+            row.itemID = rec.id
+            row.itemWeight = n(rec.cfg.weight)
+            row.itemCount = rec.count
+            row.icon:SetTexture(GetItemIcon(rec.id) or "Interface\\Icons\\INV_Misc_QuestionMark")
             local special = rec.cfg.special and " |cffffd100[Gainful Gathering]|r" or ""
             row.text:SetText(string.format("%s%s", rec.cfg.name or ("Item " .. rec.id), special))
             row.right:SetText(string.format("ID:%d  w:%.2f  looted:%d", rec.id, n(rec.cfg.weight), rec.count))
@@ -408,24 +512,26 @@ function MSA.renderActiveTab()
         local zone = GetRealZoneText() or "Unknown Zone"
         local spots = MidnightSkinAdvisorDB.spots[zone] or {}
 
-        f.spotRows[1]:Show()
-        f.spotRows[1].text:SetText("Current Zone: " .. zone)
-        f.spotRows[1].right:SetText("/msa addspot Name x y")
-        f.spotRows[1].bar:SetWidth(698)
-        f.spotRows[1].bar:SetStatusBarColor(0.28, 0.50, 0.92, 0.45)
+        local header = f.spotRows[1]
+        header:Show(); header.icon:Hide(); header.bar:SetWidth(698); header.spot = nil
+        header.text:SetText("Current Zone: " .. zone)
+        header.right:SetText("/msa addspot Name x y")
+        header.bar:SetStatusBarColor(0.28, 0.50, 0.92, 0.45)
 
         if #spots == 0 then
-            f.spotRows[2]:Show()
-            f.spotRows[2].text:SetText("No saved spots here yet.")
-            f.spotRows[2].right:SetText("Use /msa addspot River Packs 45.2 63.8")
-            f.spotRows[2].bar:SetWidth(1)
+            local r = f.spotRows[2]
+            r:Show(); r.icon:Hide(); r.spot = nil
+            r.text:SetText("No saved spots here yet.")
+            r.right:SetText("Use /msa addspot River Packs 45.2 63.8")
+            r.bar:SetWidth(1)
             return
         end
 
         for i = 1, math.min(#spots, #f.spotRows - 1) do
             local s = spots[i]
             local row = f.spotRows[i + 1]
-            row:Show()
+            row:Show(); row.icon:Show(); row.spot = s
+            row.icon:SetTexture("Interface\\Icons\\INV_Misc_Map_01")
             row.text:SetText(string.format("%d) %s (%.1f, %.1f)", i, s.name, s.x, s.y))
             row.right:SetText("/msa tomtom " .. i)
             row.bar:SetWidth(698)
@@ -433,8 +539,7 @@ function MSA.renderActiveTab()
         end
 
     elseif MSA.ui.activeTab == "settings" then
-        f.noteText:Show()
-        f.resetButton:Show()
+        f.noteText:Show(); f.resetButton:Show()
         local notes = { "|cff8fe9ffFarm Intelligence|r" }
         for _, note in ipairs(MidnightSkinAdvisorDB.notes) do notes[#notes + 1] = "• " .. note end
         notes[#notes + 1] = ""
@@ -442,18 +547,16 @@ function MSA.renderActiveTab()
         notes[#notes + 1] = "/msa hv  •  Mark current zone as high-value beast farm"
         notes[#notes + 1] = "/msa weight <itemID> <weight>  •  tune value model"
         notes[#notes + 1] = "/msa ui  •  open/close advisor"
+        notes[#notes + 1] = ""
+        notes[#notes + 1] = "|cff8fe9ffMinimap|r"
+        notes[#notes + 1] = "Left-click minimap icon to open UI, right-drag to move."
         f.noteText:SetText(table.concat(notes, "\n"))
     end
 end
 
-local function cmdUI()
+cmdUI = function()
     ensureWindow()
-    if MSA.window:IsShown() then
-        MSA.window:Hide()
-    else
-        MSA.renderActiveTab()
-        MSA.window:Show()
-    end
+    if MSA.window:IsShown() then MSA.window:Hide() else MSA.renderActiveTab(); MSA.window:Show() end
 end
 
 local function cmdHelp()
@@ -517,7 +620,8 @@ MSA:SetScript("OnEvent", function(_, event, ...)
     end
 
     if event == "PLAYER_LOGIN" then
-        printHeader("v2.2 loaded. /msa ui")
+        ensureMinimapButton()
+        printHeader("v2.3 loaded. /msa ui")
         return
     end
 
