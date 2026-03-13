@@ -76,3 +76,7 @@ This repo is CurseForge-packager ready:
 2. Upload the zip on your CurseForge project files page.
 
 After publication, users can install/update with one click via CurseForge App/WowUp.
+
+## Project Image
+
+Use `assets/midnight-skin-advisor-icon.png` (512x512) as your CurseForge project/logo image.
