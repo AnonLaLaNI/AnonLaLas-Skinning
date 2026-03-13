@@ -1,0 +1,9 @@
+## Interface: 120001
+## Title: Midnight Skin Advisor
+## Notes: Skinning + Leatherworking farm advisor for Midnight 12.0.1
+## Author: Franz
+## Version: 2.0.0
+## SavedVariables: MidnightSkinAdvisorDB
+## OptionalDeps: TomTom
+
+MidnightSkinAdvisor.lua
