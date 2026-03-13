@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.3.2
+
+### Improved
+- Made the main UI more transparent for better world visibility while farming.
+- Refined minimap button visuals (proper background + border + highlight) to avoid the odd look.
+
+### Fixed
+- Cleaned minimap icon placement/drag behavior styling.
+
 ## v2.3.1
 
 ### Fixed

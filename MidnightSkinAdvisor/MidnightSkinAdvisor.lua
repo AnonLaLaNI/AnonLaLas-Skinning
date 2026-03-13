@@ -31,7 +31,7 @@ local DEFAULT_CONFIG = {
 local function ensureDB()
     MidnightSkinAdvisorDB = MidnightSkinAdvisorDB or {}
     local db = MidnightSkinAdvisorDB
-    db.version = "2.3.1"
+    db.version = "2.3.2"
     db.createdAt = db.createdAt or now()
     db.config = db.config or {}
     for k, v in pairs(DEFAULT_CONFIG) do if db.config[k] == nil then db.config[k] = v end end
@@ -257,21 +257,33 @@ local function ensureMinimapButton()
     end
 
     local b = CreateFrame("Button", "MSA_MinimapButton", Minimap)
-    b:SetSize(32, 32)
+    b:SetSize(31, 31)
     b:SetFrameStrata("MEDIUM")
     b:SetFrameLevel(8)
-    b:SetNormalTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+
+    b.bg = b:CreateTexture(nil, "BACKGROUND")
+    b.bg:SetAllPoints()
+    b.bg:SetTexture("Interface\\Minimap\\MiniMap-TrackingBackground")
 
     b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetSize(18, 18)
+    b.icon:SetSize(20, 20)
     b.icon:SetPoint("CENTER", 0, 1)
     b.icon:SetTexture("Interface\\Icons\\INV_Misc_Pelt_Wolf_01")
+
+    b.border = b:CreateTexture(nil, "OVERLAY")
+    b.border:SetAllPoints()
+    b.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+
+    b.highlight = b:CreateTexture(nil, "HIGHLIGHT")
+    b.highlight:SetAllPoints()
+    b.highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+    b.highlight:SetBlendMode("ADD")
 
     local function updatePosition()
         local angle = (MidnightSkinAdvisorDB.minimap and MidnightSkinAdvisorDB.minimap.angle) or 225
         local rad = math.rad(angle)
-        local x = math.cos(rad) * 80
-        local y = math.sin(rad) * 80
+        local x = math.cos(rad) * 78
+        local y = math.sin(rad) * 78
         b:ClearAllPoints()
         b:SetPoint("CENTER", Minimap, "CENTER", x, y)
     end
@@ -290,7 +302,7 @@ local function ensureMinimapButton()
         local px, py = GetCursorPosition()
         local scale = UIParent:GetEffectiveScale()
         px, py = px / scale, py / scale
-        local angle = math.deg((math.atan2 and math.atan2(py - my, px - mx)) or math.atan((py - my), (px - mx)))
+        local angle = math.deg((math.atan2 and math.atan2(py - my, px - mx)) or math.atan(py - my, px - mx))
         MidnightSkinAdvisorDB.minimap.angle = angle
         updatePosition()
     end)
@@ -328,12 +340,12 @@ local function ensureWindow()
         edgeSize = 14,
         insets = { left = 3, right = 3, top = 3, bottom = 3 }
     })
-    f:SetBackdropColor(0.03, 0.04, 0.08, 0.96)
-    f:SetBackdropBorderColor(0.35, 0.5, 0.95, 1)
+    f:SetBackdropColor(0.03, 0.04, 0.08, 0.58)
+    f:SetBackdropBorderColor(0.35, 0.5, 0.95, 0.9)
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     f.title:SetPoint("TOPLEFT", 14, -8)
-    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3.1|r")
+    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3.2|r")
 
     f.subtitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.subtitle:SetPoint("TOPLEFT", 16, -34)
@@ -342,6 +354,7 @@ local function ensureWindow()
     f.panel = CreateFrame("Frame", nil, f, "InsetFrameTemplate3")
     f.panel:SetPoint("TOPLEFT", 12, -64)
     f.panel:SetPoint("BOTTOMRIGHT", -12, 12)
+    f.panel:SetAlpha(0.78)
 
     f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.status:SetPoint("TOPLEFT", f.panel, "TOPLEFT", 12, -10)
@@ -621,7 +634,7 @@ MSA:SetScript("OnEvent", function(_, event, ...)
 
     if event == "PLAYER_LOGIN" then
         ensureMinimapButton()
-        printHeader("v2.3.1 loaded. /msa ui")
+        printHeader("v2.3.2 loaded. /msa ui")
         return
     end
 
