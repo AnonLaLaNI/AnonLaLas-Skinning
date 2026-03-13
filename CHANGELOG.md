@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.1
+
+### Fixed
+- Fixed UI not opening on some clients by adding `BackdropTemplate` compatibility to the main frame.
+- Improved minimap drag angle calculation fallback for client Lua variants.
+
 ## v2.3.0
 
 ### Added

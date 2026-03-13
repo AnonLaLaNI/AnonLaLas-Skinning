@@ -1,4 +1,4 @@
-# Midnight Skin Advisor (v2.3.0)
+# Midnight Skin Advisor (v2.3.1)
 
 WoW AddOn for **Midnight 12.0.1** to optimize Skinning/Leatherworking farm routes using your real loot data.
 

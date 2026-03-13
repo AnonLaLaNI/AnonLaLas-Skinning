@@ -2,7 +2,7 @@
 ## Title: Midnight Skin Advisor
 ## Notes: Skinning + Leatherworking farm advisor for Midnight 12.0.1
 ## Author: Franz
-## Version: 2.3.0
+## Version: 2.3.1
 ## SavedVariables: MidnightSkinAdvisorDB
 ## OptionalDeps: TomTom
 

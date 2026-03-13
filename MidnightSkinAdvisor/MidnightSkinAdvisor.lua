@@ -31,7 +31,7 @@ local DEFAULT_CONFIG = {
 local function ensureDB()
     MidnightSkinAdvisorDB = MidnightSkinAdvisorDB or {}
     local db = MidnightSkinAdvisorDB
-    db.version = "2.3.0"
+    db.version = "2.3.1"
     db.createdAt = db.createdAt or now()
     db.config = db.config or {}
     for k, v in pairs(DEFAULT_CONFIG) do if db.config[k] == nil then db.config[k] = v end end
@@ -290,7 +290,7 @@ local function ensureMinimapButton()
         local px, py = GetCursorPosition()
         local scale = UIParent:GetEffectiveScale()
         px, py = px / scale, py / scale
-        local angle = math.deg(math.atan2(py - my, px - mx))
+        local angle = math.deg((math.atan2 and math.atan2(py - my, px - mx)) or math.atan((py - my), (px - mx)))
         MidnightSkinAdvisorDB.minimap.angle = angle
         updatePosition()
     end)
@@ -312,7 +312,7 @@ end
 local function ensureWindow()
     if MSA.window then return end
 
-    local f = CreateFrame("Frame", "MSA_MainFrame", UIParent, "BasicFrameTemplateWithInset")
+    local f = CreateFrame("Frame", "MSA_MainFrame", UIParent, "BasicFrameTemplateWithInset,BackdropTemplate")
     f:SetSize(760, 500)
     f:SetPoint("CENTER")
     f:SetMovable(true)
@@ -333,7 +333,7 @@ local function ensureWindow()
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     f.title:SetPoint("TOPLEFT", 14, -8)
-    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3|r")
+    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3.1|r")
 
     f.subtitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.subtitle:SetPoint("TOPLEFT", 16, -34)
@@ -621,7 +621,7 @@ MSA:SetScript("OnEvent", function(_, event, ...)
 
     if event == "PLAYER_LOGIN" then
         ensureMinimapButton()
-        printHeader("v2.3 loaded. /msa ui")
+        printHeader("v2.3.1 loaded. /msa ui")
         return
     end
 
