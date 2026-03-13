@@ -5,78 +5,54 @@ MSA:RegisterEvent("ADDON_LOADED")
 MSA:RegisterEvent("CHAT_MSG_LOOT")
 MSA:RegisterEvent("PLAYER_LOGIN")
 
-local function now()
-    return time()
-end
+local function now() return time() end
+local function n(v) return tonumber(v) or 0 end
 
-local function n(v)
-    return tonumber(v) or 0
-end
-
-local function round(v, d)
-    local p = 10 ^ (d or 0)
-    return math.floor((v * p) + 0.5) / p
-end
-
--- v2.0 preset items from user links
--- weight = relative value in spot scoring
--- special = requires Gainful Gathering spec to be realistically farmable
 local PRESET_ITEMS = {
-    [238511] = { name = "Void-Tempered Leather",   weight = 1.00, type = "leather" },
-    [238513] = { name = "Void-Tempered Scales",    weight = 1.00, type = "scales" },
-    [238518] = { name = "Void-Tempered Hide",      weight = 1.35, type = "hide" },
-    [238520] = { name = "Void-Tempered Plating",   weight = 1.45, type = "plating" },
-    [238525] = { name = "Fantastic Fur",           weight = 8.00, type = "special", special = true },
-    [238522] = { name = "Peerless Plumage",        weight = 8.00, type = "special", special = true },
-    [238523] = { name = "Carving Canine",          weight = 8.00, type = "special", special = true },
-    [238528] = { name = "Majestic Claw",           weight = 2.50, type = "majestic" },
-    [238529] = { name = "Majestic Hide",           weight = 2.50, type = "majestic" },
-    [238530] = { name = "Majestic Fin",            weight = 2.50, type = "majestic" },
+    [238511] = { name = "Void-Tempered Leather", weight = 1.00, type = "leather" },
+    [238513] = { name = "Void-Tempered Scales", weight = 1.00, type = "scales" },
+    [238518] = { name = "Void-Tempered Hide", weight = 1.35, type = "hide" },
+    [238520] = { name = "Void-Tempered Plating", weight = 1.45, type = "plating" },
+    [238525] = { name = "Fantastic Fur", weight = 8.00, type = "special", special = true },
+    [238522] = { name = "Peerless Plumage", weight = 8.00, type = "special", special = true },
+    [238523] = { name = "Carving Canine", weight = 8.00, type = "special", special = true },
+    [238528] = { name = "Majestic Claw", weight = 2.50, type = "majestic" },
+    [238529] = { name = "Majestic Hide", weight = 2.50, type = "majestic" },
+    [238530] = { name = "Majestic Fin", weight = 2.50, type = "majestic" },
 }
 
 local DEFAULT_CONFIG = {
-    highValueBeastBonus = 1.20, -- multiplier used when user flags "high value beast" kills in a zone
+    highValueBeastBonus = 1.20,
     useTomTom = true,
 }
 
 local function ensureDB()
     MidnightSkinAdvisorDB = MidnightSkinAdvisorDB or {}
     local db = MidnightSkinAdvisorDB
-
-    db.version = "2.0.0"
+    db.version = "2.2.0"
     db.createdAt = db.createdAt or now()
     db.config = db.config or {}
-    for k, v in pairs(DEFAULT_CONFIG) do
-        if db.config[k] == nil then db.config[k] = v end
-    end
+    for k, v in pairs(DEFAULT_CONFIG) do if db.config[k] == nil then db.config[k] = v end end
 
     db.items = db.items or {}
     db.zones = db.zones or {}
-    db.spots = db.spots or {} -- user curated spot list per zone
+    db.spots = db.spots or {}
     db.notes = db.notes or {
         "Special mats (Fantastic Fur / Peerless Plumage / Carving Canine) need Gainful Gathering spec.",
         "Those three mats currently appear extremely rare; community reports possible drop bug.",
         "High Value Beasts usually add 5-10 extra leather/scales when skinned.",
     }
 
-    -- Auto-import preset item ids once
     if not db.itemConfig then
         db.itemConfig = {}
         for itemID, info in pairs(PRESET_ITEMS) do
-            db.itemConfig[itemID] = {
-                name = info.name,
-                weight = info.weight,
-                special = info.special and true or false,
-                enabled = true,
-            }
+            db.itemConfig[itemID] = { name = info.name, weight = info.weight, special = info.special and true or false, enabled = true }
         end
     end
 end
 
 local function getZoneKey()
-    local zone = GetRealZoneText() or "Unknown Zone"
-    local sub = GetSubZoneText() or "Unknown Subzone"
-    return zone .. " :: " .. sub
+    return (GetRealZoneText() or "Unknown Zone") .. " :: " .. (GetSubZoneText() or "Unknown Subzone")
 end
 
 local function parseItemIDFromLink(itemLink)
@@ -103,15 +79,11 @@ local function addLoot(itemID, count)
     local cfg = db.itemConfig[itemID]
     if not cfg or not cfg.enabled then return end
 
-    local zoneKey = getZoneKey()
-    local zone = getOrCreateZone(zoneKey)
-
+    local zone = getOrCreateZone(getZoneKey())
     zone.lastAt = now()
     zone.totalCount = zone.totalCount + count
     zone.items[itemID] = (zone.items[itemID] or 0) + count
-
-    local weight = n(cfg.weight)
-    zone.weightedScore = zone.weightedScore + (count * weight)
+    zone.weightedScore = zone.weightedScore + (count * n(cfg.weight))
     db.items[itemID] = (db.items[itemID] or 0) + count
 end
 
@@ -129,20 +101,15 @@ local function zoneScorePerHour(zone)
     return base
 end
 
-local function printHeader(text)
-    print("|cff6de1ffMidnightSkinAdvisor|r " .. text)
-end
-
 local function collectRankedZones()
     local rows = {}
     for zoneKey, zone in pairs(MidnightSkinAdvisorDB.zones) do
-        table.insert(rows, {
+        rows[#rows + 1] = {
             zoneKey = zoneKey,
-            score = zone.weightedScore,
             scorePH = zoneScorePerHour(zone),
             total = zone.totalCount,
             highValueFlags = zone.highValueFlags or 0,
-        })
+        }
     end
     table.sort(rows, function(a, b)
         if a.scorePH == b.scorePH then return a.total > b.total end
@@ -151,14 +118,14 @@ local function collectRankedZones()
     return rows
 end
 
+local function printHeader(text)
+    print("|cff6de1ffMidnightSkinAdvisor|r " .. text)
+end
+
 local function cmdTop()
     local rows = collectRankedZones()
     printHeader("Top farm spots (weighted score/hour)")
-    if #rows == 0 then
-        print("  Noch keine Daten. Geh skinnen und nutze /msa top erneut.")
-        return
-    end
-
+    if #rows == 0 then print("  Noch keine Daten. Geh skinnen und nutze /msa top erneut.") return end
     for i = 1, math.min(10, #rows) do
         local r = rows[i]
         print(string.format("  %d) %s | %.1f /h | total:%d | HV flags:%d", i, r.zoneKey, r.scorePH, r.total, r.highValueFlags))
@@ -176,9 +143,7 @@ end
 
 local function cmdNote()
     printHeader("Important notes")
-    for _, line in ipairs(MidnightSkinAdvisorDB.notes) do
-        print("  - " .. line)
-    end
+    for _, line in ipairs(MidnightSkinAdvisorDB.notes) do print("  - " .. line) end
 end
 
 local function cmdReset()
@@ -187,88 +152,10 @@ local function cmdReset()
     printHeader("Session data reset.")
 end
 
-local function ensureWindow()
-    if MSA.window then return end
-
-    local f = CreateFrame("Frame", "MSA_MainFrame", UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(620, 420)
-    f:SetPoint("CENTER")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:Hide()
-
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.title:SetPoint("LEFT", f.TitleBg, "LEFT", 8, 0)
-    f.title:SetText("Midnight Skin Advisor v2.0")
-
-    f.scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    f.scroll:SetPoint("TOPLEFT", 12, -36)
-    f.scroll:SetPoint("BOTTOMRIGHT", -28, 12)
-
-    f.content = CreateFrame("Frame", nil, f.scroll)
-    f.content:SetSize(560, 1)
-    f.scroll:SetScrollChild(f.content)
-
-    f.text = f.content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.text:SetPoint("TOPLEFT", 0, 0)
-    f.text:SetJustifyH("LEFT")
-    f.text:SetJustifyV("TOP")
-
-    MSA.window = f
-end
-
-local function renderWindow()
-    ensureWindow()
-
-    local lines = {}
-    table.insert(lines, "|cff6de1ffTop spots by weighted score/hour|r")
-
-    local ranked = collectRankedZones()
-    if #ranked == 0 then
-        table.insert(lines, "No data yet. Start skinning.")
-    else
-        for i = 1, math.min(12, #ranked) do
-            local r = ranked[i]
-            table.insert(lines, string.format("%d) %s", i, r.zoneKey))
-            table.insert(lines, string.format("   score/h: %.1f | total: %d | high-value flags: %d", r.scorePH, r.total, r.highValueFlags))
-        end
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, "|cff6de1ffTracked Items|r")
-    for itemID, cfg in pairs(MidnightSkinAdvisorDB.itemConfig) do
-        local special = cfg.special and " |cffffd100[Gainful Gathering]|r" or ""
-        table.insert(lines, string.format("%d - %s (w=%.2f)%s", itemID, cfg.name or "?", n(cfg.weight), special))
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, "|cff6de1ffNotes|r")
-    for _, note in ipairs(MidnightSkinAdvisorDB.notes) do
-        table.insert(lines, "- " .. note)
-    end
-
-    local text = table.concat(lines, "\n")
-    MSA.window.text:SetText(text)
-    MSA.window.content:SetHeight(math.max(400, 14 * #lines))
-end
-
-local function cmdUI()
-    ensureWindow()
-    if MSA.window:IsShown() then
-        MSA.window:Hide()
-    else
-        renderWindow()
-        MSA.window:Show()
-    end
-end
-
 local function cmdFlagHV()
     local zone = getOrCreateZone(getZoneKey())
     zone.highValueFlags = (zone.highValueFlags or 0) + 1
-    printHeader("High Value Beast flag added for current zone (bonus weighted in ranking).")
+    printHeader("High Value Beast flag added for current zone.")
 end
 
 local function cmdAddSpot(name, x, y)
@@ -282,132 +169,342 @@ local function cmdSpots()
     local zone = GetRealZoneText() or "Unknown Zone"
     local spots = MidnightSkinAdvisorDB.spots[zone] or {}
     printHeader("Spots for " .. zone)
-    if #spots == 0 then
-        print("  Keine Spots gespeichert. /msa addspot Name 45.2 63.8")
-        return
-    end
-    for i, s in ipairs(spots) do
-        print(string.format("  %d) %s (%.1f, %.1f)", i, s.name, s.x, s.y))
-    end
+    if #spots == 0 then print("  Keine Spots gespeichert. /msa addspot Name 45.2 63.8") return end
+    for i, s in ipairs(spots) do print(string.format("  %d) %s (%.1f, %.1f)", i, s.name, s.x, s.y)) end
 end
 
 local function cmdTomTom(idx)
-    if not TomTom or not TomTom.AddWaypoint then
-        printHeader("TomTom nicht gefunden. Installiere TomTom für Waypoints.")
-        return
-    end
-
+    if not TomTom or not TomTom.AddWaypoint then printHeader("TomTom nicht gefunden. Installiere TomTom für Waypoints.") return end
     local zone = GetRealZoneText() or "Unknown Zone"
     local spots = MidnightSkinAdvisorDB.spots[zone] or {}
-    local nIdx = tonumber(idx) or 1
-    local s = spots[nIdx]
-    if not s then
-        printHeader("Spot index nicht gefunden. /msa spots")
-        return
-    end
-
+    local s = spots[tonumber(idx) or 1]
+    if not s then printHeader("Spot index nicht gefunden. /msa spots") return end
     local mapID = C_Map.GetBestMapForUnit("player")
-    if not mapID then
-        printHeader("Kein mapID gefunden.")
-        return
-    end
-
-    TomTom:AddWaypoint(mapID, s.x / 100, s.y / 100, {
-        title = "MSA: " .. s.name,
-        persistent = false,
-        minimap = true,
-        world = true,
-    })
+    if not mapID then printHeader("Kein mapID gefunden.") return end
+    TomTom:AddWaypoint(mapID, s.x / 100, s.y / 100, { title = "MSA: " .. s.name, persistent = false, minimap = true, world = true })
     printHeader("TomTom waypoint gesetzt: " .. s.name)
 end
 
 local function cmdWeight(itemID, weight)
-    itemID = tonumber(itemID)
-    weight = tonumber(weight)
-    if not itemID or not weight then
-        print("Usage: /msa weight <itemID> <weight>")
-        return
-    end
-
-    MidnightSkinAdvisorDB.itemConfig[itemID] = MidnightSkinAdvisorDB.itemConfig[itemID] or {
-        name = "Item " .. itemID,
-        enabled = true,
-        special = false,
-    }
+    itemID, weight = tonumber(itemID), tonumber(weight)
+    if not itemID or not weight then print("Usage: /msa weight <itemID> <weight>") return end
+    MidnightSkinAdvisorDB.itemConfig[itemID] = MidnightSkinAdvisorDB.itemConfig[itemID] or { name = "Item " .. itemID, enabled = true, special = false }
     MidnightSkinAdvisorDB.itemConfig[itemID].weight = weight
     printHeader(string.format("Weight set: %d -> %.2f", itemID, weight))
 end
 
 local function cmdAdd(itemLink, weight)
     local itemID = parseItemIDFromLink(itemLink)
-    if not itemID then
-        print("Usage: /msa add [itemLink] <weight>")
-        return
-    end
-
-    local name = itemLink:match("%[(.-)%]") or ("Item " .. itemID)
+    if not itemID then print("Usage: /msa add [itemLink] <weight>") return end
     MidnightSkinAdvisorDB.itemConfig[itemID] = {
-        name = name,
+        name = itemLink:match("%[(.-)%]") or ("Item " .. itemID),
         weight = tonumber(weight) or 1,
         special = false,
         enabled = true,
     }
-    printHeader(string.format("Item added: %s (%d)", name, itemID))
+    printHeader("Item added: " .. MidnightSkinAdvisorDB.itemConfig[itemID].name)
+end
+
+-- UI -------------------------------------------------------------------------
+MSA.ui = { activeTab = "overview", rows = {}, itemRows = {}, spotRows = {} }
+
+local TAB_COLOR = "|cff8fe9ff"
+local TITLE_COLOR = "|cffb89bff"
+
+local function clearRows(rows)
+    for i = 1, #rows do
+        rows[i]:Hide()
+    end
+end
+
+local function ensureWindow()
+    if MSA.window then return end
+
+    local f = CreateFrame("Frame", "MSA_MainFrame", UIParent, "BasicFrameTemplateWithInset")
+    f:SetSize(760, 500)
+    f:SetPoint("CENTER")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:Hide()
+
+    f:SetBackdrop({
+        bgFile = "Interface/Buttons/WHITE8X8",
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 }
+    })
+    f:SetBackdropColor(0.03, 0.04, 0.08, 0.96)
+    f:SetBackdropBorderColor(0.35, 0.5, 0.95, 1)
+
+    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    f.title:SetPoint("TOPLEFT", 14, -8)
+    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.2|r")
+
+    f.subtitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.subtitle:SetPoint("TOPLEFT", 16, -34)
+    f.subtitle:SetText("Route your best Skinning + Leatherworking farm spots")
+
+    f.panel = CreateFrame("Frame", nil, f, "InsetFrameTemplate3")
+    f.panel:SetPoint("TOPLEFT", 12, -64)
+    f.panel:SetPoint("BOTTOMRIGHT", -12, 12)
+
+    f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.status:SetPoint("TOPLEFT", f.panel, "TOPLEFT", 12, -10)
+    f.status:SetText("Session: --")
+
+    f.hvButton = CreateFrame("Button", nil, f.panel, "UIPanelButtonTemplate")
+    f.hvButton:SetSize(120, 22)
+    f.hvButton:SetPoint("TOPRIGHT", -12, -8)
+    f.hvButton:SetText("+ High Value")
+    f.hvButton:SetScript("OnClick", function() cmdFlagHV(); if MSA.window:IsShown() then MSA.renderActiveTab() end end)
+
+    local function makeTab(name, key, x)
+        local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        b:SetSize(120, 24)
+        b:SetPoint("TOPLEFT", f.panel, "TOPLEFT", x, 20)
+        b:SetText(name)
+        b.key = key
+        b:SetScript("OnClick", function()
+            MSA.ui.activeTab = b.key
+            MSA.renderActiveTab()
+        end)
+        return b
+    end
+
+    f.tabs = {
+        makeTab("Overview", "overview", 8),
+        makeTab("Spots", "spots", 136),
+        makeTab("Items", "items", 264),
+        makeTab("Settings", "settings", 392),
+    }
+
+    f.content = CreateFrame("Frame", nil, f.panel)
+    f.content:SetPoint("TOPLEFT", 10, -36)
+    f.content:SetPoint("BOTTOMRIGHT", -10, 10)
+
+    local function createRow(parent, y)
+        local row = CreateFrame("Frame", nil, parent)
+        row:SetSize(700, 28)
+        row:SetPoint("TOPLEFT", 4, y)
+
+        row.barBg = row:CreateTexture(nil, "BACKGROUND")
+        row.barBg:SetAllPoints()
+        row.barBg:SetColorTexture(0.08, 0.10, 0.16, 0.8)
+
+        row.bar = CreateFrame("StatusBar", nil, row)
+        row.bar:SetStatusBarTexture("Interface/TargetingFrame/UI-StatusBar")
+        row.bar:SetMinMaxValues(0, 100)
+        row.bar:SetValue(0)
+        row.bar:SetPoint("TOPLEFT", 1, -1)
+        row.bar:SetPoint("BOTTOMLEFT", 1, 1)
+        row.bar:SetWidth(1)
+        row.bar:SetStatusBarColor(0.28, 0.55, 1, 0.8)
+
+        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.text:SetPoint("LEFT", 8, 0)
+        row.text:SetJustifyH("LEFT")
+
+        row.right = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        row.right:SetPoint("RIGHT", -8, 0)
+        row.right:SetJustifyH("RIGHT")
+
+        row:Hide()
+        return row
+    end
+
+    for i = 1, 11 do f.overviewRows = f.overviewRows or {}; f.overviewRows[i] = createRow(f.content, -8 - ((i - 1) * 32)) end
+    for i = 1, 14 do f.itemRows = f.itemRows or {}; f.itemRows[i] = createRow(f.content, -8 - ((i - 1) * 30)) end
+    for i = 1, 12 do f.spotRows = f.spotRows or {}; f.spotRows[i] = createRow(f.content, -8 - ((i - 1) * 32)) end
+
+    f.noteText = f.content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.noteText:SetPoint("TOPLEFT", 8, -10)
+    f.noteText:SetWidth(690)
+    f.noteText:SetJustifyH("LEFT")
+    f.noteText:SetJustifyV("TOP")
+    f.noteText:Hide()
+
+    f.resetButton = CreateFrame("Button", nil, f.content, "UIPanelButtonTemplate")
+    f.resetButton:SetSize(180, 24)
+    f.resetButton:SetPoint("BOTTOMLEFT", 8, 8)
+    f.resetButton:SetText("Reset Session Data")
+    f.resetButton:SetScript("OnClick", function() cmdReset(); MSA.renderActiveTab() end)
+    f.resetButton:Hide()
+
+    MSA.window = f
+end
+
+local function updateStatusLine()
+    local db = MidnightSkinAdvisorDB
+    local totalLoot = 0
+    for _, count in pairs(db.items) do totalLoot = totalLoot + count end
+    local zones = 0
+    for _ in pairs(db.zones) do zones = zones + 1 end
+    local mins = math.floor((now() - (db.createdAt or now())) / 60)
+    MSA.window.status:SetText(string.format("|cffa8c7ffSession|r %dm   |cffa8c7ffZones|r %d   |cffa8c7ffTotal Loot|r %d", mins, zones, totalLoot))
+end
+
+function MSA.renderActiveTab()
+    ensureWindow()
+    local f = MSA.window
+    updateStatusLine()
+
+    clearRows(f.overviewRows); clearRows(f.itemRows); clearRows(f.spotRows)
+    f.noteText:Hide(); f.resetButton:Hide()
+
+    for _, tab in ipairs(f.tabs) do
+        if tab.key == MSA.ui.activeTab then
+            tab:GetFontString():SetText(TAB_COLOR .. tab:GetText() .. "|r")
+        else
+            tab:GetFontString():SetText(tab:GetText():gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+        end
+    end
+
+    if MSA.ui.activeTab == "overview" then
+        local ranked = collectRankedZones()
+        if #ranked == 0 then
+            f.overviewRows[1]:Show()
+            f.overviewRows[1].text:SetText("No data yet — start skinning and loot tracking will fill this view.")
+            f.overviewRows[1].right:SetText("")
+            f.overviewRows[1].bar:SetWidth(1)
+            return
+        end
+
+        local maxScore = ranked[1].scorePH > 0 and ranked[1].scorePH or 1
+        for i = 1, math.min(#ranked, #f.overviewRows) do
+            local r, row = ranked[i], f.overviewRows[i]
+            row:Show()
+            row.text:SetText(string.format("%d) %s", i, r.zoneKey))
+            row.right:SetText(string.format("%.1f/h  •  %d loot  •  HV %d", r.scorePH, r.total, r.highValueFlags))
+            local pct = math.max(0.02, math.min(1, r.scorePH / maxScore))
+            row.bar:SetWidth(698 * pct)
+            if i == 1 then row.bar:SetStatusBarColor(0.48, 0.82, 0.36, 0.85)
+            elseif i <= 3 then row.bar:SetStatusBarColor(0.34, 0.62, 1.0, 0.85)
+            else row.bar:SetStatusBarColor(0.45, 0.45, 0.78, 0.7) end
+        end
+
+    elseif MSA.ui.activeTab == "items" then
+        local rows = {}
+        for itemID, cfg in pairs(MidnightSkinAdvisorDB.itemConfig) do
+            rows[#rows + 1] = { id = itemID, cfg = cfg, count = MidnightSkinAdvisorDB.items[itemID] or 0 }
+        end
+        table.sort(rows, function(a, b) return a.count > b.count end)
+
+        for i = 1, math.min(#rows, #f.itemRows) do
+            local row, rec = f.itemRows[i], rows[i]
+            row:Show()
+            local special = rec.cfg.special and " |cffffd100[Gainful Gathering]|r" or ""
+            row.text:SetText(string.format("%s%s", rec.cfg.name or ("Item " .. rec.id), special))
+            row.right:SetText(string.format("ID:%d  w:%.2f  looted:%d", rec.id, n(rec.cfg.weight), rec.count))
+            local pct = math.min(1, math.max(0.03, rec.count / math.max(1, rows[1].count)))
+            row.bar:SetWidth(698 * pct)
+            if rec.cfg.special then row.bar:SetStatusBarColor(0.92, 0.72, 0.2, 0.85)
+            else row.bar:SetStatusBarColor(0.3, 0.6, 1.0, 0.75) end
+        end
+
+    elseif MSA.ui.activeTab == "spots" then
+        local zone = GetRealZoneText() or "Unknown Zone"
+        local spots = MidnightSkinAdvisorDB.spots[zone] or {}
+
+        f.spotRows[1]:Show()
+        f.spotRows[1].text:SetText("Current Zone: " .. zone)
+        f.spotRows[1].right:SetText("/msa addspot Name x y")
+        f.spotRows[1].bar:SetWidth(698)
+        f.spotRows[1].bar:SetStatusBarColor(0.28, 0.50, 0.92, 0.45)
+
+        if #spots == 0 then
+            f.spotRows[2]:Show()
+            f.spotRows[2].text:SetText("No saved spots here yet.")
+            f.spotRows[2].right:SetText("Use /msa addspot River Packs 45.2 63.8")
+            f.spotRows[2].bar:SetWidth(1)
+            return
+        end
+
+        for i = 1, math.min(#spots, #f.spotRows - 1) do
+            local s = spots[i]
+            local row = f.spotRows[i + 1]
+            row:Show()
+            row.text:SetText(string.format("%d) %s (%.1f, %.1f)", i, s.name, s.x, s.y))
+            row.right:SetText("/msa tomtom " .. i)
+            row.bar:SetWidth(698)
+            row.bar:SetStatusBarColor(0.18, 0.38, 0.68, 0.45)
+        end
+
+    elseif MSA.ui.activeTab == "settings" then
+        f.noteText:Show()
+        f.resetButton:Show()
+        local notes = { "|cff8fe9ffFarm Intelligence|r" }
+        for _, note in ipairs(MidnightSkinAdvisorDB.notes) do notes[#notes + 1] = "• " .. note end
+        notes[#notes + 1] = ""
+        notes[#notes + 1] = "|cff8fe9ffQuick Commands|r"
+        notes[#notes + 1] = "/msa hv  •  Mark current zone as high-value beast farm"
+        notes[#notes + 1] = "/msa weight <itemID> <weight>  •  tune value model"
+        notes[#notes + 1] = "/msa ui  •  open/close advisor"
+        f.noteText:SetText(table.concat(notes, "\n"))
+    end
+end
+
+local function cmdUI()
+    ensureWindow()
+    if MSA.window:IsShown() then
+        MSA.window:Hide()
+    else
+        MSA.renderActiveTab()
+        MSA.window:Show()
+    end
 end
 
 local function cmdHelp()
     printHeader("Commands")
+    print("  /msa ui               - Toggle beautiful UI")
     print("  /msa top              - Ranked zones by weighted score/hour")
-    print("  /msa ui               - Toggle compact UI")
     print("  /msa items            - List tracked item IDs and weights")
     print("  /msa note             - Show important farm notes")
     print("  /msa reset            - Reset collected session data")
-    print("  /msa hv               - Flag current zone for High Value Beast activity")
+    print("  /msa hv               - Flag High Value Beast activity")
     print("  /msa add [link] <w>   - Add tracked item from link")
     print("  /msa weight <id> <w>  - Set item weight")
     print("  /msa addspot Name x y - Save spot in current zone")
     print("  /msa spots            - List saved spots in current zone")
-    print("  /msa tomtom [index]   - Set TomTom waypoint to saved spot")
+    print("  /msa tomtom [index]   - Set TomTom waypoint")
 end
 
 SLASH_MSA1 = "/msa"
 SlashCmdList["MSA"] = function(msg)
     msg = msg or ""
-
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
     cmd = (cmd or ""):lower()
 
     if cmd == "" or cmd == "help" then
         cmdHelp()
-    elseif cmd == "top" then
-        cmdTop()
     elseif cmd == "ui" then
         cmdUI()
+    elseif cmd == "top" then
+        cmdTop()
     elseif cmd == "items" then
         cmdItems()
     elseif cmd == "note" then
         cmdNote()
     elseif cmd == "reset" then
-        cmdReset()
+        cmdReset(); if MSA.window and MSA.window:IsShown() then MSA.renderActiveTab() end
     elseif cmd == "hv" then
-        cmdFlagHV()
+        cmdFlagHV(); if MSA.window and MSA.window:IsShown() then MSA.renderActiveTab() end
     elseif cmd == "spots" then
         cmdSpots()
     elseif cmd == "tomtom" then
         cmdTomTom(rest)
     elseif cmd == "weight" then
         local itemID, weight = rest:match("^(%d+)%s+([%d%.]+)$")
-        cmdWeight(itemID, weight)
+        cmdWeight(itemID, weight); if MSA.window and MSA.window:IsShown() then MSA.renderActiveTab() end
     elseif cmd == "add" then
         local link, weight = rest:match("^(|Hitem:.-|h%[.-%]|h)%s*([%d%.]*)$")
-        cmdAdd(link, weight)
+        cmdAdd(link, weight); if MSA.window and MSA.window:IsShown() then MSA.renderActiveTab() end
     elseif cmd == "addspot" then
         local name, x, y = rest:match("^(.-)%s+([%d%.]+)%s+([%d%.]+)$")
-        if not name then
-            print("Usage: /msa addspot Name 45.2 63.8")
-            return
-        end
-        cmdAddSpot(name, tonumber(x), tonumber(y))
+        if not name then print("Usage: /msa addspot Name 45.2 63.8") return end
+        cmdAddSpot(name, tonumber(x), tonumber(y)); if MSA.window and MSA.window:IsShown() then MSA.renderActiveTab() end
     else
         cmdHelp()
     end
@@ -415,15 +512,12 @@ end
 
 MSA:SetScript("OnEvent", function(_, event, ...)
     if event == "ADDON_LOADED" then
-        local addon = ...
-        if addon == ADDON_NAME then
-            ensureDB()
-        end
+        if ... == ADDON_NAME then ensureDB() end
         return
     end
 
     if event == "PLAYER_LOGIN" then
-        printHeader("v2.0 loaded. /msa help")
+        printHeader("v2.2 loaded. /msa ui")
         return
     end
 
@@ -431,11 +525,9 @@ MSA:SetScript("OnEvent", function(_, event, ...)
         local msg = ...
         local itemLink = msg and msg:match("(|Hitem:.-|h%[.-%]|h)")
         if not itemLink then return end
-
         local itemID = parseItemIDFromLink(itemLink)
         if not itemID then return end
-
-        local count = tonumber(msg:match("x(%d+)")) or 1
-        addLoot(itemID, count)
+        addLoot(itemID, tonumber(msg:match("x(%d+)")) or 1)
+        if MSA.window and MSA.window:IsShown() then MSA.renderActiveTab() end
     end
 end)

@@ -1,4 +1,4 @@
-# Midnight Skin Advisor (v2.0.0)
+# Midnight Skin Advisor (v2.2.0)
 
 WoW AddOn for **Midnight 12.0.1** to optimize Skinning/Leatherworking farm routes using your real loot data.
 
@@ -9,7 +9,7 @@ WoW AddOn for **Midnight 12.0.1** to optimize Skinning/Leatherworking farm route
 - Preset support for your Midnight mats
 - Notes for special mats and current drop-rate caveat
 - Optional High-Value-Beast zone flag (`/msa hv`)
-- Compact in-game UI (`/msa ui`)
+- Polished in-game tab UI (`/msa ui`) with Overview / Spots / Items / Settings
 - Optional TomTom waypoint support for saved spots
 
 ## Tracked Item Preset (auto-imported)
