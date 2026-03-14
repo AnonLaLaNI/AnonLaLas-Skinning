@@ -31,7 +31,7 @@ local DEFAULT_CONFIG = {
 local function ensureDB()
     MidnightSkinAdvisorDB = MidnightSkinAdvisorDB or {}
     local db = MidnightSkinAdvisorDB
-    db.version = "2.3.2"
+    db.version = "2.3.3"
     db.createdAt = db.createdAt or now()
     db.config = db.config or {}
     for k, v in pairs(DEFAULT_CONFIG) do if db.config[k] == nil then db.config[k] = v end end
@@ -263,20 +263,22 @@ local function ensureMinimapButton()
 
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints()
-    b.bg:SetTexture("Interface\\Minimap\\MiniMap-TrackingBackground")
+    b.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    b.bg:SetVertexColor(0.06, 0.08, 0.14, 0.9)
 
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetSize(20, 20)
-    b.icon:SetPoint("CENTER", 0, 1)
+    b.icon:SetPoint("CENTER", 0, 0)
     b.icon:SetTexture("Interface\\Icons\\INV_Misc_Pelt_Wolf_01")
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     b.border = b:CreateTexture(nil, "OVERLAY")
     b.border:SetAllPoints()
-    b.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    b.border:SetTexture("Interface\\Buttons\\UI-Quickslot2")
 
     b.highlight = b:CreateTexture(nil, "HIGHLIGHT")
     b.highlight:SetAllPoints()
-    b.highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+    b.highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
     b.highlight:SetBlendMode("ADD")
 
     local function updatePosition()
@@ -324,7 +326,7 @@ end
 local function ensureWindow()
     if MSA.window then return end
 
-    local f = CreateFrame("Frame", "MSA_MainFrame", UIParent, "BasicFrameTemplateWithInset,BackdropTemplate")
+    local f = CreateFrame("Frame", "MSA_MainFrame", UIParent, "BackdropTemplate")
     f:SetSize(760, 500)
     f:SetPoint("CENTER")
     f:SetMovable(true)
@@ -340,21 +342,31 @@ local function ensureWindow()
         edgeSize = 14,
         insets = { left = 3, right = 3, top = 3, bottom = 3 }
     })
-    f:SetBackdropColor(0.03, 0.04, 0.08, 0.58)
-    f:SetBackdropBorderColor(0.35, 0.5, 0.95, 0.9)
+    f:SetBackdropColor(0.02, 0.03, 0.07, 0.14)
+    f:SetBackdropBorderColor(0.35, 0.5, 0.95, 0.45)
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("TOPLEFT", 14, -8)
-    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3.2|r")
+    f.title:SetPoint("TOPLEFT", 14, -10)
+    f.title:SetText(TITLE_COLOR .. "Midnight Skin Advisor v2.3.3|r")
+
+    f.close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    f.close:SetPoint("TOPRIGHT", -4, -4)
 
     f.subtitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.subtitle:SetPoint("TOPLEFT", 16, -34)
     f.subtitle:SetText("Route your best Skinning + Leatherworking farm spots")
 
-    f.panel = CreateFrame("Frame", nil, f, "InsetFrameTemplate3")
+    f.panel = CreateFrame("Frame", nil, f, "BackdropTemplate")
     f.panel:SetPoint("TOPLEFT", 12, -64)
     f.panel:SetPoint("BOTTOMRIGHT", -12, 12)
-    f.panel:SetAlpha(0.78)
+    f.panel:SetBackdrop({
+        bgFile = "Interface/Buttons/WHITE8X8",
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+        edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    f.panel:SetBackdropColor(0.02, 0.03, 0.07, 0.08)
+    f.panel:SetBackdropBorderColor(0.28, 0.42, 0.82, 0.28)
 
     f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.status:SetPoint("TOPLEFT", f.panel, "TOPLEFT", 12, -10)
@@ -397,7 +409,7 @@ local function ensureWindow()
 
         row.barBg = row:CreateTexture(nil, "BACKGROUND")
         row.barBg:SetAllPoints()
-        row.barBg:SetColorTexture(0.08, 0.10, 0.16, 0.8)
+        row.barBg:SetColorTexture(0.08, 0.10, 0.16, 0.26)
 
         row.bar = CreateFrame("StatusBar", nil, row)
         row.bar:SetStatusBarTexture("Interface/TargetingFrame/UI-StatusBar")
@@ -634,7 +646,7 @@ MSA:SetScript("OnEvent", function(_, event, ...)
 
     if event == "PLAYER_LOGIN" then
         ensureMinimapButton()
-        printHeader("v2.3.2 loaded. /msa ui")
+        printHeader("v2.3.3 loaded. /msa ui")
         return
     end
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.3.3
+
+### Improved
+- Finalized release version strings for 2.3.3 (removed local/dev suffixes).
+- Refined the UI style for a cleaner transparent look while farming.
+- Updated minimap button visuals (background, border, highlight, icon crop/alignment).
+
+### Fixed
+- Ensured consistent UI frame setup and close button behavior in the refreshed layout.
+
 ## v2.3.2
 
 ### Improved
